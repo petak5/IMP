@@ -7,19 +7,25 @@
 
 #include "lcd_1602_i2c.h"
 
-#define BUTTON_1 14
-#define BUTTON_2 15
+// Number of laps stored
+#define MAX_LAPS 99
+
+// Start/Stop (pause) button
+#define BUTTON_1 13
+// Lap/Reset button
+#define BUTTON_2 14
+// Show next lap button
+#define BUTTON_3 15
 
 bool running = false;
 bool do_clear_screen = false;
 time_t measured_time = 0;
+int laps = 0;
+int shown_lap = 0;
 struct repeating_timer timer;
 
-char messages[MAX_LINES][MAX_CHARS + 1] =
-{
-    "0:00:00",
-    ""
-};
+char message_time[MAX_CHARS + 1] = "0:00:00";
+char messages_lap[MAX_LAPS + 1][MAX_CHARS + 1];
 
 int64_t alarm_callback(alarm_id_t id, void *user_data) {
     if (!running)
@@ -28,16 +34,28 @@ int64_t alarm_callback(alarm_id_t id, void *user_data) {
     }
 
     measured_time += 1;
-    int minutes = measured_time / 360000;
-    int seconds = measured_time / 100;
-    int deca_seconds = measured_time % 100;
-    sprintf(messages[0], "%d:%0.2d:%0.2d", minutes, seconds, deca_seconds);
+    int minutes = measured_time / 6000;
+    int seconds = (measured_time % 6000) / 100;
+    int centi_seconds = measured_time % 100;
+    sprintf(message_time, "%d:%0.2d:%0.2d", minutes, seconds, centi_seconds);
     return -10000;
 }
 
+unsigned button_1_last_press = 0;
+unsigned button_2_last_press = 0;
+unsigned button_3_last_press = 0;
 void gpio_callback(uint gpio, uint32_t events) {
     if (gpio == BUTTON_1)
     {
+        if (button_1_last_press + 200 > millis())
+        {
+            return;
+        }
+        else
+        {
+            button_1_last_press = millis();
+        }
+
         if (running)
         {
             running = false;
@@ -45,38 +63,71 @@ void gpio_callback(uint gpio, uint32_t events) {
         else
         {
             add_alarm_in_ms(10, alarm_callback, NULL, false);
+            shown_lap = laps;
             running = true;
         }
     }
     else if (gpio == BUTTON_2)
     {
+        if (button_2_last_press + 200 > millis())
+        {
+            return;
+        }
+        else
+        {
+            button_2_last_press = millis();
+        }
+
         if (running)
         {
-            sprintf(messages[1], "Lap: %s", messages[0]);
+            if (laps < MAX_LAPS)
+            {
+                // Increment both variables
+                shown_lap = ++laps;
+                sprintf(messages_lap[shown_lap], "Lap %d: %s", shown_lap, message_time);
+            }
         }
         else
         {
             measured_time = 0;
-            sprintf(messages[0], "%d:%0.2d:%0.2d", 0, 0, 0);
-            sprintf(messages[1], "");
+            sprintf(message_time, "%d:%0.2d:%0.2d", 0, 0, 0);
+            for (int i = 0; i < laps; i++)
+            {
+                sprintf(messages_lap[i], "");
+            }
+            shown_lap = laps = 0;
+            do_clear_screen = true;
+        }
+    }
+    else if (gpio == BUTTON_3)
+    {
+        if (button_3_last_press + 200 > millis())
+        {
+            return;
+        }
+        else
+        {
+            button_3_last_press = millis();
+        }
+
+        if (!running)
+        {
+            shown_lap++;
+            if (shown_lap > laps)
+            {
+                shown_lap = 1;
+            }
             do_clear_screen = true;
         }
     }
 }
 
-void init_buttons()
+void init_button(int button)
 {
-    // Button 1
-    gpio_init(BUTTON_1);
-    gpio_set_dir(BUTTON_1, GPIO_IN);
-    gpio_pull_up(BUTTON_1);
-    gpio_set_irq_enabled_with_callback(BUTTON_1, GPIO_IRQ_EDGE_FALL, true, &gpio_callback);
-
-    // Button 2
-    gpio_init(BUTTON_2);
-    gpio_set_dir(BUTTON_2, GPIO_IN);
-    gpio_pull_up(BUTTON_2);
-    gpio_set_irq_enabled_with_callback(BUTTON_2, GPIO_IRQ_EDGE_FALL, true, &gpio_callback);
+    gpio_init(button);
+    gpio_set_dir(button, GPIO_IN);
+    gpio_pull_up(button);
+    gpio_set_irq_enabled_with_callback(button, GPIO_IRQ_EDGE_FALL, true, &gpio_callback);
 }
 
 int main() {
@@ -98,24 +149,27 @@ int main() {
     gpio_init(PICO_DEFAULT_LED_PIN);
     gpio_set_dir(PICO_DEFAULT_LED_PIN, GPIO_OUT);
 
-    init_buttons();
+    // Init button
+    init_button(BUTTON_1);
+    init_button(BUTTON_2);
+    init_button(BUTTON_3);
 
     while (1) {
         // Print message
-        lcd_set_cursor(0, MAX_CHARS - strlen(messages[0]));
-        lcd_string(messages[0]);
-        lcd_set_cursor(1, MAX_CHARS - strlen(messages[1]));
-        lcd_string(messages[1]);
+        lcd_set_cursor(0, MAX_CHARS - strlen(message_time));
+        lcd_string(message_time);
+        lcd_set_cursor(1, MAX_CHARS - strlen(messages_lap[shown_lap]));
+        lcd_string(messages_lap[shown_lap]);
 
         if (running)
         {
             gpio_put(PICO_DEFAULT_LED_PIN, true);
-            sleep_ms(100);
+            sleep_ms(10);
             gpio_put(PICO_DEFAULT_LED_PIN, false);
         }
         else
         {
-            sleep_ms(100);
+            sleep_ms(10);
         }
 
         if (do_clear_screen)
