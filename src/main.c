@@ -24,7 +24,7 @@ int laps = 0;
 int shown_lap = 0;
 struct repeating_timer timer;
 
-char message_time[MAX_CHARS + 1] = "0:00:00";
+char message_time[MAX_CHARS + 1] = "0:00.00";
 char messages_lap[MAX_LAPS + 1][MAX_CHARS + 1];
 
 int64_t alarm_callback(alarm_id_t id, void *user_data) {
@@ -37,7 +37,7 @@ int64_t alarm_callback(alarm_id_t id, void *user_data) {
     int minutes = measured_time / 6000;
     int seconds = (measured_time % 6000) / 100;
     int centi_seconds = measured_time % 100;
-    sprintf(message_time, "%d:%0.2d:%0.2d", minutes, seconds, centi_seconds);
+    sprintf(message_time, "%d:%0.2d.%0.2d", minutes, seconds, centi_seconds);
     return -10000;
 }
 
@@ -90,7 +90,7 @@ void gpio_callback(uint gpio, uint32_t events) {
         else
         {
             measured_time = 0;
-            sprintf(message_time, "%d:%0.2d:%0.2d", 0, 0, 0);
+            sprintf(message_time, "%d:%0.2d.%0.2d", 0, 0, 0);
             for (int i = 0; i < laps; i++)
             {
                 sprintf(messages_lap[i], "");
