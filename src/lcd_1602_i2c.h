@@ -1,5 +1,8 @@
 // Source: https://github.com/raspberrypi/pico-examples/blob/master/i2c/lcd_1602_i2c/lcd_1602_i2c.c
 
+#ifndef __LCD_1602_I2C_H__
+#define __LCD_1602_I2C_H__
+
 /**
  * Copyright (c) 2020 Raspberry Pi (Trading) Ltd.
  *
@@ -126,3 +129,5 @@ void lcd_init() {
     lcd_send_byte(LCD_DISPLAYCONTROL | LCD_DISPLAYON, LCD_COMMAND);
     lcd_clear();
 }
+
+#endif  // __LCD_1602_I2C_H__

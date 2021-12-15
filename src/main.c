@@ -1,3 +1,7 @@
+// Brief: Simple stopwatch implementation using Raspberry Pi Pico
+// Author: Peter Urgos (xurgos00)
+// Date: 12/2021
+
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
